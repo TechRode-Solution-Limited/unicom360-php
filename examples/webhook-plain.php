@@ -7,6 +7,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../vendor/autoload.php';
 
+use Unicom360\Exception\ConfigurationException;
 use Unicom360\Exception\SignatureVerificationException;
 use Unicom360\Exception\Unicom360Exception;
 use Unicom360\Webhook;
@@ -25,6 +26,12 @@ try {
 } catch (SignatureVerificationException $e) {
     http_response_code(401);
     error_log("Rejected webhook: {$e->getReason()}");
+
+    exit;
+} catch (ConfigurationException $e) {
+    // The secret is unset or blank: a fault on this server, not a bad delivery.
+    http_response_code(500);
+    error_log($e->getMessage());
 
     exit;
 } catch (Unicom360Exception) {

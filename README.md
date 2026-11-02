@@ -259,7 +259,7 @@ Everything the SDK throws extends `Unicom360\Exception\Unicom360Exception` (a
 
 | Exception | When | Retried |
 |---|---|---|
-| `ConfigurationException` | no API key, a bad base URL or option | |
+| `ConfigurationException` | no API key, a bad base URL or option, a blank webhook secret | |
 | `ApiConnectionException` | DNS, refused connection, TLS, reset | before sending: always; after: if retry-safe |
 | `ApiTimeoutException` (extends `ApiConnectionException`) | connect or response timeout | connect: always; response: if retry-safe |
 | `ApiStatusException` | any other non-2xx (3xx, 403, 404, ...), or a 2xx without a usable envelope | never |
@@ -403,6 +403,10 @@ Symfony is the same with `$request->getContent()` and `$request->headers`.
 - The secret is the 43-character string from the portal, used as is. The signature is
   `sha256=` and the lowercase hex HMAC-SHA256 of `"<X-Unicom360-Timestamp>.<raw body>"`,
   compared in constant time; deliveries more than 300 seconds from your clock are rejected.
+- An empty or whitespace-only secret (an unset environment variable through `(string) getenv()`,
+  say) throws `ConfigurationException` before any other check, because anyone can forge a
+  signature with an empty key. That is a fault in your configuration, not a failed verification:
+  let it answer 500, and do not catch it where you answer 401.
 - An event this SDK does not know yet parses as `UnknownEvent` (with `data` as an array)
   instead of failing. Answer it 2xx.
 - Deliveries are retried on any non-2xx answer (after 30 s, 2 min, 10 min, 30 min, 1 h, 3 h,

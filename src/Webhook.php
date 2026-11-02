@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Unicom360;
 
+use Unicom360\Exception\ConfigurationException;
 use Unicom360\Exception\SignatureVerificationException;
 use Unicom360\Exception\Unicom360Exception;
 use Unicom360\Internal\Json;
@@ -49,10 +50,14 @@ final class Webhook
      *                                                PSR-7 message or a Symfony/Laravel HeaderBag;
      *                                                names are case-insensitive
      * @param string $secret the endpoint's signing secret from the portal, used as is (never
-     *                       base64-decoded)
+     *                       trimmed or base64-decoded)
      * @param int $tolerance the clock skew allowed, in seconds
      * @param int|float|null $now the current Unix time (defaults to the system clock)
      *
+     * @throws ConfigurationException before any other check, when the secret is empty or only
+     *                                whitespace: anyone can forge a signature with an empty key.
+     *                                It is a fault in your configuration, not a failed
+     *                                verification.
      * @throws SignatureVerificationException
      */
     public static function verify(
@@ -63,6 +68,10 @@ final class Webhook
         int $tolerance = self::DEFAULT_TOLERANCE,
         int|float|null $now = null,
     ): void {
+        // Also true for Unicode spaces; invalid UTF-8 makes preg_match fail, and is not blank.
+        if (preg_match('/\A\s*\z/u', $secret) === 1) {
+            throw new ConfigurationException('The webhook secret is empty or only whitespace: set it to the secret from the portal.');
+        }
         $signature = self::header($headers, self::SIGNATURE_HEADER);
         if ($signature === null || $signature === '') {
             throw new SignatureVerificationException(SignatureVerificationException::MISSING_SIGNATURE);
@@ -96,6 +105,7 @@ final class Webhook
      *
      * @param array<array-key, mixed>|object $headers see verify()
      *
+     * @throws ConfigurationException when the secret is empty or only whitespace
      * @throws SignatureVerificationException when verification fails
      * @throws Unicom360Exception when the body is not a JSON object with a string "event"
      */

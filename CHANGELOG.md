@@ -30,7 +30,8 @@ First release. Targets the Unicom360 API contract v0.1.0 (`unicom360-openapi` ta
   reached the gateway is retried only for reads and referenced SMS and WhatsApp sends.
 - The `autoReferenceIds` option, which gives sends a generated `user_reference_id`.
 - `Unicom360\Webhook::verify()`, `constructEvent()`, `parseSmsCallback()` and
-  `parseEmailCallback()`.
+  `parseEmailCallback()`. An empty or whitespace-only secret throws `ConfigurationException`
+  before any other check, because anyone can forge a signature with an empty key.
 - `Unicom360\Gsm` helpers: `isGsm7()`, `length()`, `units()`, `nonGsmCharacters()` and
   `validateSms()`.
 - `CurlTransport` (default) and `Psr18Transport`, and optional PSR-3 logging.

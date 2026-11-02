@@ -9,6 +9,7 @@ use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Route;
+use Unicom360\Exception\ConfigurationException;
 use Unicom360\Exception\SignatureVerificationException;
 use Unicom360\Exception\Unicom360Exception;
 use Unicom360\Webhook;
@@ -25,6 +26,9 @@ Route::post('/webhooks/unicom360', static function (Request $request): Response 
         Log::warning('Rejected Unicom360 webhook', ['reason' => $e->getReason()]);
 
         return new Response('', 401);
+    } catch (ConfigurationException $e) {
+        // The secret is unset or blank: a fault on this server, not a bad delivery. Answers 500.
+        throw $e;
     } catch (Unicom360Exception) {
         return new Response('', 400);
     }

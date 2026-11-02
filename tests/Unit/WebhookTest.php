@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace Unicom360\Tests\Unit;
 
 use Nyholm\Psr7\ServerRequest;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
+use Unicom360\Exception\ConfigurationException;
 use Unicom360\Exception\SignatureVerificationException;
 use Unicom360\Exception\Unicom360Exception;
 use Unicom360\Webhook;
@@ -110,6 +112,82 @@ final class WebhookTest extends TestCase
                 self::assertSame(Unicom360Exception::class, $e::class);
             }
         }
+    }
+
+    /**
+     * @return iterable<string, array{string}>
+     */
+    public static function blankSecrets(): iterable
+    {
+        yield 'empty' => [''];
+        yield 'space' => [' '];
+        yield 'spaces' => ['   '];
+        yield 'tab' => ["\t"];
+        yield 'crlf' => ["\r\n"];
+        yield 'form feed and vertical tab' => ["\f\v"];
+        yield 'mixed' => [" \t\r\n "];
+        yield 'no-break space' => ["\u{00A0}"];
+    }
+
+    /**
+     * Anyone can compute this signature, so it must never verify.
+     */
+    #[DataProvider('blankSecrets')]
+    public function testABlankSecretRefusesARequestSignedWithThatKey(string $blank): void
+    {
+        $now = 1792829762;
+        $forged = [
+            'X-Unicom360-Timestamp' => (string) $now,
+            'X-Unicom360-Signature' => 'sha256=' . hash_hmac('sha256', $now . '.' . self::BODY, $blank),
+        ];
+        $calls = [
+            static fn() => Webhook::verify(self::BODY, $forged, $blank, now: $now),
+            static fn() => Webhook::constructEvent(self::BODY, $forged, $blank, now: $now),
+        ];
+        foreach ($calls as $call) {
+            try {
+                $call();
+                self::fail('expected an error');
+            } catch (Unicom360Exception $e) {
+                self::assertInstanceOf(ConfigurationException::class, $e);
+            }
+        }
+    }
+
+    #[DataProvider('blankSecrets')]
+    public function testABlankSecretIsRefusedBeforeAnyHeaderCheck(string $blank): void
+    {
+        $this->expectException(ConfigurationException::class);
+        Webhook::verify(self::BODY, [], $blank);
+    }
+
+    public function testASecretIsUsedExactlyAsGiven(): void
+    {
+        $now = 1792829762;
+        $padded = ' ' . self::SECRET . "\n";
+        $headers = [
+            'X-Unicom360-Timestamp' => (string) $now,
+            'X-Unicom360-Signature' => 'sha256=' . hash_hmac('sha256', $now . '.' . self::BODY, $padded),
+        ];
+        Webhook::verify(self::BODY, $headers, $padded, now: $now);
+        try {
+            Webhook::verify(self::BODY, $headers, self::SECRET, now: $now);
+            self::fail('expected an error');
+        } catch (SignatureVerificationException $e) {
+            self::assertSame(SignatureVerificationException::SIGNATURE_MISMATCH, $e->getReason());
+        }
+    }
+
+    public function testInvalidUtf8IsNotBlankAndIsUsedAsGiven(): void
+    {
+        $now = 1792829762;
+        $bytes = "\xFF\xFE";
+        $headers = [
+            'X-Unicom360-Timestamp' => (string) $now,
+            'X-Unicom360-Signature' => 'sha256=' . hash_hmac('sha256', $now . '.' . self::BODY, $bytes),
+        ];
+        Webhook::verify(self::BODY, $headers, $bytes, now: $now);
+        $this->addToAssertionCount(1);
     }
 
     public function testMissingDeliveryHeaderIsNull(): void
