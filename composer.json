@@ -1,0 +1,78 @@
+{
+    "name": "unicom360/unicom360-php",
+    "description": "Official PHP SDK for the Unicom360 SMS, email and WhatsApp messaging API",
+    "type": "library",
+    "license": "MIT",
+    "keywords": [
+        "unicom360",
+        "sms",
+        "email",
+        "whatsapp",
+        "messaging",
+        "api",
+        "sdk",
+        "webhooks"
+    ],
+    "homepage": "https://unicom360.com",
+    "authors": [
+        {
+            "name": "Techrode Solutions Limited",
+            "email": "info@techrode.co",
+            "homepage": "https://unicom360.com"
+        }
+    ],
+    "support": {
+        "email": "info@techrode.co",
+        "issues": "https://github.com/TechRode-Solution-Limited/unicom360-php/issues",
+        "source": "https://github.com/TechRode-Solution-Limited/unicom360-php",
+        "docs": "https://unicom360.com/docs"
+    },
+    "require": {
+        "php": "^8.1",
+        "ext-curl": "*",
+        "ext-hash": "*",
+        "ext-json": "*"
+    },
+    "require-dev": {
+        "friendsofphp/php-cs-fixer": "^3.64",
+        "nyholm/psr7": "^1.8",
+        "phpstan/phpstan": "^2.1",
+        "phpunit/phpunit": "^10.5 || ^11.5",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.0",
+        "psr/log": "^2.0 || ^3.0"
+    },
+    "suggest": {
+        "psr/http-client": "To send requests through any PSR-18 client with Unicom360\\Http\\Psr18Transport",
+        "psr/http-factory": "Needed with psr/http-client: the PSR-17 request and stream factories Psr18Transport takes",
+        "psr/log": "To log each attempt and retry through a PSR-3 logger"
+    },
+    "autoload": {
+        "psr-4": {
+            "Unicom360\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Unicom360\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "scripts": {
+        "test": "phpunit",
+        "test:contract": "phpunit --group contract",
+        "analyse": "phpstan analyse --memory-limit=1G",
+        "cs": "php-cs-fixer fix --dry-run --diff",
+        "cs:fix": "php-cs-fixer fix",
+        "check": [
+            "@composer validate --strict",
+            "@cs",
+            "@analyse",
+            "@test"
+        ]
+    }
+}

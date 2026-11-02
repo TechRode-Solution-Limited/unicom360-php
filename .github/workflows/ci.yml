@@ -1,0 +1,135 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  quality:
+    name: Lint, static analysis, composer validate, em dash
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, json
+          coverage: none
+          tools: composer:v2
+      - name: composer validate
+        run: composer validate --strict
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+      - name: PHP-CS-Fixer (PER-CS 2.0)
+        run: vendor/bin/php-cs-fixer fix --dry-run --diff
+      - name: PHPStan (level max)
+        run: vendor/bin/phpstan analyse --no-progress --memory-limit=1G
+      - name: No em dash
+        shell: bash
+        run: |
+          if grep -rn --exclude-dir=vendor --exclude-dir=.git $'\xe2\x80\x94' .; then
+            echo "The em dash character is not allowed; rewrite the sentence."
+            exit 1
+          fi
+
+  actionlint:
+    name: actionlint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: actionlint
+        uses: docker://rhysd/actionlint:1.7.7
+        with:
+          args: -color
+
+  tests:
+    name: PHPUnit (PHP ${{ matrix.php }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        php: ['8.1', '8.2', '8.3', '8.4', '8.5']
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: ${{ matrix.php }}
+          extensions: curl, json
+          coverage: none
+          tools: composer:v2
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+      - name: PHPUnit (conformance and unit)
+        run: vendor/bin/phpunit
+
+  package:
+    name: Package contents
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Tests, fixtures, examples and dev config stay out of the dist archive
+        shell: bash
+        run: |
+          git archive --format=tar HEAD | tar -t > files.txt
+          cat files.txt
+          for path in tests/ examples/ .github/ phpunit.xml.dist phpstan.neon.dist .php-cs-fixer.dist.php; do
+            if grep -q "^${path}" files.txt; then
+              echo "${path} must be export-ignored"
+              exit 1
+            fi
+          done
+          for path in src/Client.php composer.json README.md LICENSE CHANGELOG.md; do
+            grep -qx "${path}" files.txt || { echo "${path} is missing from the archive"; exit 1; }
+          done
+
+  contract:
+    name: Contract test against Prism
+    runs-on: ubuntu-latest
+    env:
+      UNICOM360_CONTRACT_BASE_URL: http://127.0.0.1:4012
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check out the contract at the pinned tag
+        uses: actions/checkout@v4
+        with:
+          repository: TechRode-Solution-Limited/unicom360-openapi
+          ref: v0.1.0
+          path: unicom360-openapi
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: The vendored fixtures match the pinned contract
+        run: unicom360-openapi/scripts/sync-conformance --check tests/conformance
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: curl, json
+          coverage: none
+          tools: composer:v2
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+      - name: Start Prism
+        run: |
+          docker run -d --name prism -p 4012:4010 \
+            -v "$GITHUB_WORKSPACE/unicom360-openapi:/spec:ro" stoplight/prism:5 \
+            mock -h 0.0.0.0 --multiprocess=false --errors /spec/openapi.yaml
+          for _ in $(seq 1 60); do
+            curl -sf -o /dev/null "$UNICOM360_CONTRACT_BASE_URL/health" && exit 0
+            sleep 1
+          done
+          docker logs prism
+          exit 1
+      - name: PHPUnit (contract group)
+        run: vendor/bin/phpunit --group contract
+      - name: Prism logs
+        if: failure()
+        run: docker logs prism

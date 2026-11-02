@@ -1,0 +1,61 @@
+<?php
+
+// Minimal stubs of the Laravel classes examples/webhook-laravel.php uses, so PHPStan can
+// analyse the example without installing Laravel.
+
+namespace Illuminate\Http {
+    class Request
+    {
+        /** @var \Symfony\Component\HttpFoundation\HeaderBag */
+        public $headers;
+
+        /** @return string */
+        public function getContent() {}
+    }
+
+    class Response
+    {
+        /**
+         * @param mixed $content
+         * @param int $status
+         */
+        public function __construct($content = '', $status = 200) {}
+    }
+}
+
+namespace Symfony\Component\HttpFoundation {
+    class HeaderBag
+    {
+        /** @return array<string, list<string|null>> */
+        public function all() {}
+
+        /** @return string|null */
+        public function get(string $key, ?string $default = null) {}
+    }
+}
+
+namespace Illuminate\Support\Facades {
+    class Route
+    {
+        /**
+         * @param callable|array<mixed>|string $action
+         * @return void
+         */
+        public static function post(string $uri, $action) {}
+    }
+
+    class Log
+    {
+        /**
+         * @param array<string, mixed> $context
+         * @return void
+         */
+        public static function info(string $message, array $context = []) {}
+
+        /**
+         * @param array<string, mixed> $context
+         * @return void
+         */
+        public static function warning(string $message, array $context = []) {}
+    }
+}

@@ -1,0 +1,12 @@
+parameters:
+    level: max
+    paths:
+        - src
+        - examples
+        - tests
+    excludePaths:
+        - tests/conformance
+    scanFiles:
+        - tests/stubs/laravel.stub
+    treatPhpDocTypesAsCertain: false
+    reportUnmatchedIgnoredErrors: true
